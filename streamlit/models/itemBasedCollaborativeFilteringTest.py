@@ -20,7 +20,7 @@ class itemBasedCollaborativeFilteringTest(Model):
 
     print(f"Model loaded from {path_abs}")
 
-  def recommend(self, movies_rating: dict) -> list:
+  def recommend(self, movies_rating: dict, number_of_recommendations: int) -> list:
     # Prepare user history DataFrame with only valid items
     user_hist = []
     for movieId, movie in movies_rating.items():
@@ -29,7 +29,7 @@ class itemBasedCollaborativeFilteringTest(Model):
     user_hist_df = pd.DataFrame(user_hist)
     hist_items = ItemList.from_df(user_hist_df, keep_user=False)
     query = RecQuery(user_id=9999, user_items=hist_items)
-    rec = recommend(state.mode_itemcf_test, query, n=20)
+    rec = recommend(state.mode_itemcf_test, query, n=number_of_recommendations)
     rec_df = rec.to_df()
     # Store only the recommended movie IDs
 
