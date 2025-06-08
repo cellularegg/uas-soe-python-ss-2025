@@ -2,22 +2,22 @@ import os
 import pandas as pd
 import requests
 import streamlit as st
+from streamlit import session_state as state
 import random
 import pickle
 from lenskit.data import RecQuery, ItemList
 from lenskit import recommend
 
 TMDB_API_TOKEN = os.getenv("TMDB_API_TOKEN")
-TMDB_BASE_IMG_URL = "https://image.tmdb.org/t/p/w200"
-CACHE_CSV = ".cache/posters.csv"
+TMDB_BASE_IMG_URL = os.getenv("TMDB_BASE_IMG_URL", "https://image.tmdb.org/t/p/w200")
+CACHE_CSV = os.getenv("MR_CACHE_POSTERS_URLS", ".cache/posters.csv")
 
 ##### Helpers #####
 def get_random_movies():
-    # Store only the IDs of the random movies
-    return random.sample(list(st.session_state.movies['movieId']), 20)
+    return random.sample(list(state.df_movies['movieId']), 20)
 
 def _get_poster_url_from_cache(tmdb_id):
-    cached = st.session_state.poster_cache_df[st.session_state.poster_cache_df.tmdb_id == tmdb_id]
+    cached = state.df_movies_poster_cache[state.df_movies_poster_cache.tmdb_id == tmdb_id]
     if not cached.empty:
         return cached.iloc[0].poster_url
     return None
@@ -28,22 +28,30 @@ def _get_poster_url_from_api(tmdb_id):
         "accept": "application/json",
         "Authorization": f"Bearer {TMDB_API_TOKEN}"
     }
+
     try:
         res = requests.get(url, headers=headers, timeout=3)
         posters = res.json().get("posters", [])
-        if posters:
-            poster_url = f"{TMDB_BASE_IMG_URL}{posters[10]['file_path']}" if len(posters) > 10 else f"{TMDB_BASE_IMG_URL}{posters[0]['file_path']}"
-        else:
+        # Find the first poster with iso_639_1 == "en"
+        poster_url = None
+        for poster in posters:
+            if poster.get("iso_639_1") == "en":
+                poster_url = f"{TMDB_BASE_IMG_URL}{poster['file_path']}"
+                break
+        # If not found, fallback to first poster if available
+        if not poster_url and posters:
+            poster_url = f"{TMDB_BASE_IMG_URL}{posters[0]['file_path']}"
+        if not poster_url:
             poster_url = "https://via.placeholder.com/200x300?text=No+Image"
     except:
         poster_url = "https://via.placeholder.com/200x300?text=No+Image"
 
-    st.session_state.poster_cache_df = pd.concat([
-        st.session_state.poster_cache_df,
+    state.df_movies_poster_cache = pd.concat([
+        state.df_movies_poster_cache,
         pd.DataFrame([[tmdb_id, poster_url]], columns=["tmdb_id", "poster_url"])
     ], ignore_index=True).drop_duplicates(subset=["tmdb_id"], keep="last")
 
-    st.session_state.poster_cache_df.to_csv(CACHE_CSV, index=False)
+    state.df_movies_poster_cache.to_csv(CACHE_CSV, index=False)
     return poster_url
 
 @st.cache_data(show_spinner=False)
@@ -59,11 +67,11 @@ def get_poster_url(tmdb_id):
     return _get_poster_url_from_api(tmdb_id)
 
 ##### Session State #####
-def _init_cache():
+def init_cache():
     """
     Initializes the cache directory and CSV file for poster URLs.
     """
-    # Ensure the cache folder exists
+
     cache_dir = os.path.dirname(CACHE_CSV)
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir, exist_ok=True)
@@ -72,8 +80,11 @@ def _init_cache():
     if not os.path.exists(CACHE_CSV):
         pd.DataFrame(columns=["tmdb_id", "poster_url"]).to_csv(CACHE_CSV, index=False)
 
+    if "df_movies_poster_cache" not in state:
+        state.df_movies_poster_cache = pd.read_csv(CACHE_CSV)
+
 @st.cache_data
-def _load_csv():
+def load_csv():
     """
     Loads movies and links CSV files, merges them and saves into session state.
     """
@@ -89,41 +100,28 @@ def init_session_state():
     """
     Loads CSV files, Initializes movie posters links cache and session state variables
     """
-
-    _init_cache()
-    st.session_state.poster_cache_df = pd.read_csv(CACHE_CSV)
-
-    if "movies" not in st.session_state:
-        st.session_state.movies = _load_csv()
-    if "movies_grid_ids" not in st.session_state:
-        st.session_state.movies_grid_ids = get_random_movies()
-    if "recommended_movies_grid_ids" not in st.session_state:
-        st.session_state.recommended_movies_grid_ids = list()
-    if "movies_ratings" not in st.session_state:
-        st.session_state.movies_ratings = {}
-
 ##### models #####
 def _load_itemitemcollaborativefiltering_model():
   # Load model (itemitem collaborative filtering)
   MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '../models/item-based-collaborative-filtering.pkl'))
-  if "itemcf_model" not in st.session_state:
+  if "itemcf_model" not in state:
       with open(MODEL_PATH, 'rb') as f:
-          st.session_state.itemcf_model = pickle.load(f)
+          state.itemcf_model = pickle.load(f)
 
 def itemitemcollaborativefiltering():
-    if "itemcf_model" not in st.session_state:
+    if "itemcf_model" not in state:
         _load_itemitemcollaborativefiltering_model()
 
     # Prepare user history DataFrame with only valid items
     user_hist = []
-    for movieId, movie in st.session_state.movies_ratings.items():
+    for movieId, movie in state.dict_movies_ratings.items():
         user_hist.append({'user_id': 9999, 'item_id': movieId, 'rating': movie['rating']})
 
     user_hist_df = pd.DataFrame(user_hist)
     hist_items = ItemList.from_df(user_hist_df, keep_user=False)
     query = RecQuery(user_id=9999, user_items=hist_items)
-    rec = recommend(st.session_state.itemcf_model, query, n=20)
+    rec = recommend(state.itemcf_model, query, n=20)
     rec_df = rec.to_df()
     # Store only the recommended movie IDs
-    st.session_state.movies_grid_ids = rec_df['item_id'].tolist()
-    return st.session_state.movies_grid_ids
+
+    return rec_df['item_id'].tolist()
