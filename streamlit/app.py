@@ -1,7 +1,6 @@
 import streamlit as st
 from streamlit import session_state as state
 from utils import init_cache, load_csv, get_random_movies, get_poster_url
-from models.model import Model
 from models.itemBasedCollaborativeFiltering import itemBasedCollaborativeFiltering
 from models.itemBasedCollaborativeFilteringTest import itemBasedCollaborativeFilteringTest
 import os
@@ -132,7 +131,7 @@ with st.sidebar:
     type="primary",
     help="You need to rate at least 5 movies to get recommendations.",
     on_click=lambda: state.update(
-       list_movies_grid_ids=model.recommend(state.dict_movies_ratings), 
+       list_movies_grid_ids=model.recommend(state.dict_movies_ratings, 10), 
        search_query="", 
        recommended=True)
   )
