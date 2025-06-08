@@ -13,7 +13,7 @@ st.set_page_config(
   )
 
 ##### CONFIG ######
-random_movies_count = os.getenv("MR_RANDOM_MOVIES_COUNT", "10")
+random_movies_count = int(os.getenv("MR_RANDOM_MOVIES_COUNT", 10))
 
 ##### Manage state ######
 init_cache()
@@ -21,7 +21,7 @@ init_cache()
 if "df_movies" not in st.session_state:
   st.session_state.df_movies = load_csv()
 if "list_movies_grid_ids" not in st.session_state:
-  st.session_state.list_movies_grid_ids = get_random_movies()
+  st.session_state.list_movies_grid_ids = get_random_movies(random_movies_count)
 if "dict_movies_ratings" not in st.session_state:
   st.session_state.dict_movies_ratings = {}
 if "recommended" not in st.session_state:
@@ -46,7 +46,7 @@ with col_refresh_button:
     "🔄",
     key="new_random_movies_btn",
     help="Fetch a new set of random movies.",
-    on_click=lambda: state.update(list_movies_grid_ids=get_random_movies(), search_query="", recommended=False)
+    on_click=lambda: state.update(list_movies_grid_ids=get_random_movies(random_movies_count), search_query="", recommended=False)
   )
   st.markdown("</div>", unsafe_allow_html=True)
 

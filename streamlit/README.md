@@ -14,6 +14,20 @@ This section mainly focuses on integrating new model into the source code. The s
 
 > ⚠️ Keep in mind that a streamlit app reruns the script on each user interaction therefore managing state with this library is a nightmare - at least I don't know a better solution for now
 
+### Running the app
+Before you can run the app you need to set at least one environment variable:
+- TMDB_API_TOKEN: this is the api token you get when setting up an account at [www.themoviedb.org](https://www.themoviedb.org/settings/api)
+
+If choose to configure the app you can you that with some more environment variables
+- MR_RANDOM_MOVIES_COUNT
+- TMDB_BASE_IMG_URL
+- CACHE_CSV
+
+After setting up you dream configuration you can run this app with 
+```bash
+streamlit run app.py
+```
+
 ### Adding a new model
 For adding new models a **interface** (or whatever you guys call it in Python) `Model` was implemented. This defines two functions which need to be implemented by every new model `load` and `recommend`. One example of implementation can be found [here](./models/itemBasedCollaborativeFiltering.py). 
 

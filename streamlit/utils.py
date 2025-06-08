@@ -10,8 +10,8 @@ TMDB_BASE_IMG_URL = os.getenv("TMDB_BASE_IMG_URL", "https://image.tmdb.org/t/p/w
 CACHE_CSV = os.getenv("MR_CACHE_POSTERS_URLS", ".cache/posters.csv")
 
 ##### Helpers #####
-def get_random_movies():
-    return random.sample(list(state.df_movies['movieId']), 20)
+def get_random_movies(count: int):
+    return random.sample(list(state.df_movies['movieId']), count)
 
 def _get_poster_url_from_cache(tmdb_id):
     cached = state.df_movies_poster_cache[state.df_movies_poster_cache.tmdb_id == tmdb_id]
