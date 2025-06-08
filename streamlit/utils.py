@@ -17,14 +17,12 @@ def get_random_movies():
     return random.sample(list(st.session_state.movies['movieId']), 20)
 
 def _get_poster_url_from_cache(tmdb_id):
-    global poster_cache_df
-    cached = poster_cache_df[poster_cache_df.tmdb_id == tmdb_id]
+    cached = st.session_state.poster_cache_df[st.session_state.poster_cache_df.tmdb_id == tmdb_id]
     if not cached.empty:
         return cached.iloc[0].poster_url
     return None
 
 def _get_poster_url_from_api(tmdb_id):
-    global poster_cache_df
     url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/images"
     headers = {
         "accept": "application/json",
@@ -40,12 +38,12 @@ def _get_poster_url_from_api(tmdb_id):
     except:
         poster_url = "https://via.placeholder.com/200x300?text=No+Image"
 
-    poster_cache_df = pd.concat([
-        poster_cache_df,
+    st.session_state.poster_cache_df = pd.concat([
+        st.session_state.poster_cache_df,
         pd.DataFrame([[tmdb_id, poster_url]], columns=["tmdb_id", "poster_url"])
     ], ignore_index=True).drop_duplicates(subset=["tmdb_id"], keep="last")
-    
-    poster_cache_df.to_csv(CACHE_CSV, index=False)
+
+    st.session_state.poster_cache_df.to_csv(CACHE_CSV, index=False)
     return poster_url
 
 @st.cache_data(show_spinner=False)
@@ -91,19 +89,20 @@ def init_session_state():
     """
     Loads CSV files, Initializes movie posters links cache and session state variables
     """
-    global poster_cache_df
+
     _init_cache()
-    poster_cache_df = pd.read_csv(CACHE_CSV)
+    st.session_state.poster_cache_df = pd.read_csv(CACHE_CSV)
 
     if "movies" not in st.session_state:
         st.session_state.movies = _load_csv()
     if "movies_grid_ids" not in st.session_state:
         st.session_state.movies_grid_ids = get_random_movies()
+    if "recommended_movies_grid_ids" not in st.session_state:
+        st.session_state.recommended_movies_grid_ids = list()
     if "movies_ratings" not in st.session_state:
         st.session_state.movies_ratings = {}
 
 ##### models #####
-@st.cache_resource
 def _load_itemitemcollaborativefiltering_model():
   # Load model (itemitem collaborative filtering)
   MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '../models/item-based-collaborative-filtering.pkl'))
@@ -123,7 +122,7 @@ def itemitemcollaborativefiltering():
     user_hist_df = pd.DataFrame(user_hist)
     hist_items = ItemList.from_df(user_hist_df, keep_user=False)
     query = RecQuery(user_id=9999, user_items=hist_items)
-    rec = recommend(st.session_state.itemcf_model, query, n=10)
+    rec = recommend(st.session_state.itemcf_model, query, n=20)
     rec_df = rec.to_df()
     # Store only the recommended movie IDs
     st.session_state.movies_grid_ids = rec_df['item_id'].tolist()

@@ -1,7 +1,9 @@
 import streamlit as st
 import os
+from utils import get_poster_url, init_session_state, itemitemcollaborativefiltering, get_random_movies
 
-from utils import get_poster_url, init_session_state, itemitemcollaborativefiltering
+mode = os.getenv("MODE", "production")
+random_movies_count = os.getenv("RANDOM_MOVIES_COUNT", "production")
 
 # page config
 st.set_page_config(
@@ -13,22 +15,58 @@ st.set_page_config(
 # load movies
 init_session_state()
 
-# movie search
-st.markdown(f"# {st.session_state.movies.shape[0]:,} available movies")
-search_query = st.text_input("🔍 Search for a movie title", "")
+##### debug ######
+if mode == "dev":
+  st.markdown(f"movies_grid_ids len: {len(st.session_state.movies_grid_ids)}")
+  st.markdown(f"recommended_movies_grid_ids len: {len(st.session_state.recommended_movies_grid_ids)}")
+  st.markdown(f"movies_ratings len: {len(st.session_state.movies_ratings)}")
+
+##### Page Layout #####
+st.title(f"{st.session_state.movies.shape[0]:,} available movies")
+
+#### movie search
+left_col, right_col = st.columns([12, 1])  # slightly more room for input
+with left_col:
+  search_query = st.text_input(
+    label="🔍 Search for a movie title",
+    label_visibility="visible",
+    placeholder="Type a title...",
+    key="search_query"
+  )
+
+with right_col:
+  st.markdown("<div style='padding-top: 1.7em'>", unsafe_allow_html=True)  # aligns with input
+  st.button(
+    "🔄",
+    key="new_random_movies_btn",
+    help="Fetch a new set of random movies.",
+    on_click=lambda: st.session_state.update(movies_grid_ids=get_random_movies(), recommended_movies_grid_ids=[], search_query="")
+  )
+  st.markdown("</div>", unsafe_allow_html=True)
+
 if search_query:
-    filtered_df = st.session_state.movies[st.session_state.movies["title"].str.lower().str.contains(search_query.lower())].head(15)
+    filtered_df = st.session_state.movies[
+      st.session_state.movies["title"]\
+        .str.lower()\
+        .str.contains(search_query.lower())
+    ].head(15)
 else:
     filtered_df = st.session_state.movies.loc[
-        st.session_state.movies["movieId"].isin(st.session_state.movies_grid_ids)
+        st.session_state.movies["movieId"]\
+          .isin(st.session_state.movies_grid_ids)
     ]
-filtered_movies = filtered_df.to_dict("records")
+movies_grid = filtered_df.to_dict("records")
 
-##### movies grid #####
+#### movies grid
+if len(st.session_state.recommended_movies_grid_ids) == 0:
+   st.markdown("## Random movies")
+else:
+   st.markdown("## Recommended movies")
+   
 st.markdown("---")
 cols = st.columns(5)
 
-for i, movie in enumerate(filtered_movies):
+for i, movie in enumerate(movies_grid):
     with cols[i % 5]:
         poster_url = get_poster_url(movie["tmdbId"])
         
@@ -76,10 +114,17 @@ with st.sidebar:
     use_container_width=True,
     type="primary",
     help="You need to rate at least 5 movies to get recommendations.",
-    on_click=lambda: st.session_state.update(movies_grid=itemitemcollaborativefiltering())
+    on_click=lambda: st.session_state.update(recommended_movies_grid_ids=itemitemcollaborativefiltering(), search_query="")
   )
 
-  st.header("⭐ Your movie ratings")
+  st.button("Clear Ratings",
+    use_container_width=True,
+    type="secondary",
+    help="Clear all your movie ratings.",
+    on_click=lambda: st.session_state.update(movies_ratings={}, search_query="")
+    )
+
+  st.header(f"⭐ Your movie ratings ({len(st.session_state.movies_ratings)})")
   if st.session_state.movies_ratings:
     for movieId, movie in st.session_state.movies_ratings.items():
       title = next((m["title"] for m in st.session_state.movies.to_dict("records") if m["movieId"] == movieId), "Unknown")
