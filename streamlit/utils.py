@@ -4,9 +4,6 @@ import requests
 import streamlit as st
 from streamlit import session_state as state
 import random
-import pickle
-from lenskit.data import RecQuery, ItemList
-from lenskit import recommend
 
 TMDB_API_TOKEN = os.getenv("TMDB_API_TOKEN")
 TMDB_BASE_IMG_URL = os.getenv("TMDB_BASE_IMG_URL", "https://image.tmdb.org/t/p/w200")
@@ -95,33 +92,3 @@ def load_csv():
     merged = movies.merge(links, on="movieId", how="left").dropna(subset=["tmdbId"])
     merged["tmdbId"] = merged["tmdbId"].astype(int)
     return merged
-
-def init_session_state():
-    """
-    Loads CSV files, Initializes movie posters links cache and session state variables
-    """
-##### models #####
-def _load_itemitemcollaborativefiltering_model():
-  # Load model (itemitem collaborative filtering)
-  MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '../models/item-based-collaborative-filtering.pkl'))
-  if "itemcf_model" not in state:
-      with open(MODEL_PATH, 'rb') as f:
-          state.itemcf_model = pickle.load(f)
-
-def itemitemcollaborativefiltering():
-    if "itemcf_model" not in state:
-        _load_itemitemcollaborativefiltering_model()
-
-    # Prepare user history DataFrame with only valid items
-    user_hist = []
-    for movieId, movie in state.dict_movies_ratings.items():
-        user_hist.append({'user_id': 9999, 'item_id': movieId, 'rating': movie['rating']})
-
-    user_hist_df = pd.DataFrame(user_hist)
-    hist_items = ItemList.from_df(user_hist_df, keep_user=False)
-    query = RecQuery(user_id=9999, user_items=hist_items)
-    rec = recommend(state.itemcf_model, query, n=20)
-    rec_df = rec.to_df()
-    # Store only the recommended movie IDs
-
-    return rec_df['item_id'].tolist()

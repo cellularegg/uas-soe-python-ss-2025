@@ -1,7 +1,9 @@
 import streamlit as st
 from streamlit import session_state as state
-from utils import init_cache, load_csv, get_random_movies, get_poster_url, itemitemcollaborativefiltering 
-import pandas as pd
+from utils import init_cache, load_csv, get_random_movies, get_poster_url
+from models.model import Model
+from models.itemBasedCollaborativeFiltering import itemBasedCollaborativeFiltering
+from models.itemBasedCollaborativeFilteringTest import itemBasedCollaborativeFilteringTest
 import os
 
 ##### Init streamlit WebUI ######
@@ -102,13 +104,22 @@ for i, movie in enumerate(movies_grid):
 ##### sidebar #####
 with st.sidebar:
   st.markdown("# Filter")
-  st.radio(
+  selected_model = st.radio(
      "Choose a model to get reccomendations",
       [
         "Item Based Collaborative Filtering", 
-        "Client Based Collaborative Filtering"
+        "Item Based Collaborative Filtering Test"
       ],
+      key="selected_model"
   )
+
+  # Load the selected model on radio change
+  if selected_model == "Item Based Collaborative Filtering":
+    model = itemBasedCollaborativeFiltering()
+    model.load('../../models/item-based-collaborative-filtering.pkl')
+  if selected_model == "Item Based Collaborative Filtering Test":
+    model = itemBasedCollaborativeFilteringTest()
+    model.load('../../models/item-based-collaborative-filtering-test.pkl')
 
   st.markdown("---")
 
@@ -120,14 +131,19 @@ with st.sidebar:
     use_container_width=True,
     type="primary",
     help="You need to rate at least 5 movies to get recommendations.",
-    on_click=lambda: state.update(list_movies_grid_ids=itemitemcollaborativefiltering(), search_query="", recommended=True)
+    on_click=lambda: state.update(
+       list_movies_grid_ids=model.recommend(state.dict_movies_ratings), 
+       search_query="", 
+       recommended=True)
   )
 
   st.button("Clear Ratings",
     use_container_width=True,
     type="secondary",
     help="Clear all your movie ratings.",
-    on_click=lambda: state.update(dict_movies_ratings={}, search_query="")
+    on_click=lambda: state.update(
+       dict_movies_ratings={},
+       search_query="")
     )
 
   st.header(f"⭐ Your movie ratings ({len(state.dict_movies_ratings)})")
