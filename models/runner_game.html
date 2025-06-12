@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    canvas { border:1px solid black; background:#eee; display:block; margin:0 auto; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="600" height="200"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let x = 50, y = 150, vy = 0, gravity = 1, jumping = false;
+let obstacles = [{x: 600, w: 20, h: 40}];
+let score = 0;
+
+document.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && !jumping) {
+        vy = -15;
+        jumping = true;
+    }
+});
+
+function update() {
+    vy += gravity;
+    y += vy;
+    if (y > 150) { y = 150; vy = 0; jumping = false; }
+
+    // Move obstacles
+    for (let o of obstacles) o.x -= 5;
+    if (obstacles[0].x < -20) {
+        obstacles.shift();
+        obstacles.push({x: 600 + Math.random() * 200, w: 20, h: 40});
+        score++;
+    }
+
+    // Collision
+    if (obstacles[0].x < x + 20 && obstacles[0].x + obstacles[0].w > x && y + 20 > 160 - obstacles[0].h) {
+        alert("Game Over! Score: " + score);
+        document.location.reload();
+    }
+
+    draw();
+    requestAnimationFrame(update);
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Player
+    ctx.fillStyle = "blue";
+    ctx.fillRect(x, y, 20, 20);
+
+    // Ground
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 170, canvas.width, 2);
+
+    // Obstacles
+    ctx.fillStyle = "red";
+    for (let o of obstacles) {
+        ctx.fillRect(o.x, 160 - o.h, o.w, o.h);
+    }
+
+    // Score
+    ctx.fillStyle = "black";
+    ctx.fillText("Score: " + score, 10, 20);
+}
+
+update();
+</script>
+</body>
+</html>
