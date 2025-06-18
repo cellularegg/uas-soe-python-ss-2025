@@ -2,17 +2,27 @@
 <html>
 <head>
   <style>
-    canvas { border:1px solid black; background:#eee; display:block; margin:0 auto; }
+    canvas {
+      border:1px solid black;
+      background:#f8f8f8;
+      display:block;
+      margin:0 auto;
+    }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
+<h3>🎬 Dodge the Distractions and Collect Movie Recommendations!</h3>
 <canvas id="gameCanvas" width="600" height="200"></canvas>
 <script>
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 let x = 50, y = 150, vy = 0, gravity = 1, jumping = false;
-let obstacles = [{x: 600, w: 20, h: 40}];
+let obstacles = [{x: 600, w: 25, h: 40}];
 let score = 0;
 
 document.addEventListener("keydown", (e) => {
@@ -31,13 +41,13 @@ function update() {
     for (let o of obstacles) o.x -= 5;
     if (obstacles[0].x < -20) {
         obstacles.shift();
-        obstacles.push({x: 600 + Math.random() * 200, w: 20, h: 40});
+        obstacles.push({x: 600 + Math.random() * 250, w: 25, h: 40});
         score++;
     }
 
     // Collision
     if (obstacles[0].x < x + 20 && obstacles[0].x + obstacles[0].w > x && y + 20 > 160 - obstacles[0].h) {
-        alert("Game Over! Score: " + score);
+        alert("💥 Oh no! A bad movie ruined your streak.\n🎯 You recommended " + score + " movies!");
         document.location.reload();
     }
 
@@ -49,22 +59,22 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Player
-    ctx.fillStyle = "blue";
-    ctx.fillRect(x, y, 20, 20);
+    ctx.font = "20px Arial";
+    ctx.fillText("🎥", x, y);
 
     // Ground
-    ctx.fillStyle = "black";
+    ctx.fillStyle = "#999";
     ctx.fillRect(0, 170, canvas.width, 2);
 
     // Obstacles
-    ctx.fillStyle = "red";
     for (let o of obstacles) {
-        ctx.fillRect(o.x, 160 - o.h, o.w, o.h);
+        ctx.fillText("🍿", o.x, 160 - o.h + 25);
     }
 
     // Score
     ctx.fillStyle = "black";
-    ctx.fillText("Score: " + score, 10, 20);
+    ctx.font = "16px Arial";
+    ctx.fillText("🎯 Recommended: " + score + " movies", 10, 20);
 }
 
 update();
