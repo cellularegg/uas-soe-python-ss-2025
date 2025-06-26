@@ -17,6 +17,9 @@ def recommend_top_n_faiss_hybrid_fast_structured(
     min_overlap=3,
     min_neighbors=15
 ):
+    fallback_min_overlap = 1
+    fallback_min_neighbors = 5
+
     if user_id not in user_map:
         return pd.DataFrame(columns=["userId", "movieId", "title", "genres", "predicted_rating", "neighbors_used"])
 
@@ -33,18 +36,14 @@ def recommend_top_n_faiss_hybrid_fast_structured(
 
     for movie_idx in range(sparse_matrix.shape[1]):
         if user_dense[movie_idx] != 0:
-            continue  # already rated
-
-        # Step 1: find users who rated this movie
-        column = sparse_matrix[:, movie_idx]
-        rated_user_indices = column.nonzero()[0]
-        if len(rated_user_indices) < min_neighbors:
             continue
 
-        # Step 2: extract vectors
-        rated_user_vectors = sparse_matrix[rated_user_indices].toarray().astype("float32")
+        column = sparse_matrix[:, movie_idx]
+        rated_user_indices = column.nonzero()[0]
+        if len(rated_user_indices) < fallback_min_neighbors:
+            continue
 
-        # Step 3: FAISS index for these vectors
+        rated_user_vectors = sparse_matrix[rated_user_indices].toarray().astype("float32")
         dense_subset = normalize(rated_user_vectors)
         d = dense_subset.shape[1]
         index = faiss.IndexFlatIP(d)
@@ -55,24 +54,28 @@ def recommend_top_n_faiss_hybrid_fast_structured(
         similarities = D[0]
         top_indices = I[0]
 
-        # Step 4: predict from top-k
-        weighted_scores, weights = [], []
+        def compute_weighted_rating(min_ol, min_nhbrs):
+            scores, weights = [], []
+            for sim, local_idx in zip(similarities, top_indices):
+                neighbor_vector = rated_user_vectors[local_idx]
+                rating = neighbor_vector[movie_idx]
+                if rating == 0:
+                    continue
+                overlap = np.sum(user_rated_mask & (neighbor_vector != 0))
+                if overlap < min_ol:
+                    continue
+                weight = sim * (overlap / (user_rated_count + 1e-10))
+                scores.append(rating * weight)
+                weights.append(weight)
+            return scores, weights
 
-        for sim, local_idx in zip(similarities, top_indices):
-            neighbor_vector = rated_user_vectors[local_idx]
-            rating = neighbor_vector[movie_idx]
-            if rating == 0:
-                continue
+        weighted_scores, weights = compute_weighted_rating(min_overlap, min_neighbors)
 
-            overlap = np.sum(user_rated_mask & (neighbor_vector != 0))
-            if overlap < min_overlap:
-                continue
-
-            weight = sim * (overlap / (user_rated_count + 1e-10))
-            weighted_scores.append(rating * weight)
-            weights.append(weight)
-
+        # Fallback if not enough neighbors
         if len(weights) < min_neighbors:
+            weighted_scores, weights = compute_weighted_rating(fallback_min_overlap, fallback_min_neighbors)
+
+        if len(weights) < fallback_min_neighbors:
             continue
 
         pred_rating = np.sum(weighted_scores) / np.sum(weights)
